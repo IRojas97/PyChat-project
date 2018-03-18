@@ -4,6 +4,8 @@ import threading
 import Channel
 import User
 import Util
+from datetime import datetime
+
 
 class Server:
     SERVER_CONFIG = {"MAX_CONNECTIONS": 15}
@@ -15,7 +17,8 @@ class Server:
 /quit                   - Exits the program.
 /list                   - Lists all available channels.
 /nick [nickname]        - Set a new nickname if not already in use.
-/away [away_message]    - Set a new away message or remove away status.\n\n""".encode('utf8')
+/away [away_message]    - Set a new away message or remove away status.
+/time                   - Returns the local time from the server \n\n""".encode('utf8')
 
     WELCOME_MESSAGE = "\n> Welcome to our chat app!!! What is your name?\n".encode('utf8')
 
@@ -105,6 +108,8 @@ class Server:
                 self.nick(user,chatMessage)
             elif '/away' in chatMessage:
                 self.away(user, chatMessage)
+            elif '/time' in chatMessage:
+                self.get_time(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -182,7 +187,6 @@ class Server:
             self.help(clientSocket)
 
     def away(self, user, chatMessage):
-
         if len(chatMessage.split()) >= 2:  #set away status
             awaymsg = chatMessage.split(' ', 1)[1]
             if user.status == "Online":
@@ -191,7 +195,7 @@ class Server:
                     "\n> Away message set to: {0}".format(user.status).encode('utf8'))
             else:
                 user.socket.sendall(
-                    "\n> Away message was set to: {0}\n>\tAway message now set to: {1}".format(user.status,awaymsg).encode('utf8'))
+                    "\n> Away message was set to: {0}\n>    Away message now set to: {1}".format(user.status,awaymsg).encode('utf8'))
                 user.status = awaymsg
 
         elif len(chatMessage.split()) == 1:
@@ -205,6 +209,11 @@ class Server:
 
         else:
             self.help(clientSocket)
+
+    def get_time(self,user, chatMessage):
+        user.socket.sendall(
+            "\n> Current local time from server is: {0}".format(str(datetime.now())).encode('utf8'))
+
 
     def send_message(self, user, chatMessage):
         if user.username in self.users_channels_map:
