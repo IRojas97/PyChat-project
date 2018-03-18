@@ -182,27 +182,26 @@ class Server:
             self.help(clientSocket)
 
     def away(self, user, chatMessage):
-        isOnline = True;
 
         if len(chatMessage.split()) >= 2:  #set away status
             awaymsg = chatMessage.split(' ', 1)[1]
-
-            if user in self.users:
-                if user.status == "Online":
-
-                else:
-                    if users.nickname == NickName:
-                        user.socket.sendall(
-                            "\n> Nickname already in use: {0}".format(NickName).encode('utf8'))
-                        isNickNameTaken = True
-
-            if not isNickNameTaken:
-                user.nickname = NickName
+            if user.status == "Online":
+                user.status = awaymsg
                 user.socket.sendall(
-                    "\n> Successfully updated nickname: {0}".format(user.nickname).encode('utf8'))
+                    "\n> Away message set to: {0}".format(user.status).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> Away message was set to: {0}\n>\tAway message now set to: {1}".format(user.status,awaymsg).encode('utf8'))
+                user.status = awaymsg
 
         elif len(chatMessage.split()) == 1:
-
+            if user.status != "Online":
+                user.status = "Online"
+                user.socket.sendall(
+                    "\n> Away message removed. Status set to: {0}".format(user.status).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> User status already {0}. Use /away [away_message] to set an away message.".format(user.status).encode('utf8'))
 
         else:
             self.help(clientSocket)
