@@ -47,12 +47,13 @@ class ChatDialog(dialog.BaseDialog):
         tk.Label(master, text="Enter host:").grid(row=0, sticky="w")
         tk.Label(master, text="Enter port:").grid(row=1, sticky="w")
 
-        self.hostEntryField = entry.BaseEntry(master, placeholder="Enter host")
-        self.portEntryField = entry.BaseEntry(master, placeholder="Enter port")
+
+        self.hostEntryField = entry.BaseEntry(master, placeholder="localhost")
+        self.portEntryField = entry.BaseEntry(master, placeholder="50000")
+
 
         self.hostEntryField.grid(row=0, column=1)
         self.portEntryField.grid(row=1, column=1)
-        return self.hostEntryField
 
     def validate(self):
         host = str(self.hostEntryField.get())

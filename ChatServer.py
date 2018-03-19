@@ -282,7 +282,7 @@ class Server:
         else:
             self.help(clientSocket)
 
-    def kick(self, user, chatMessage):  #TODO channel_op verification
+    def kick(self, user, chatMessage):
         if len(chatMessage.split()) >= 2:
             _user = chatMessage.split()[1]
             found = False;
@@ -293,22 +293,30 @@ class Server:
                     if kicked_user != user:
                         if len(chatMessage.split()) >= 3:
                             channel_name = chatMessage.split()[2]
-                            if channel_name == self.users_channels_map[kicked_user.username]:
-                                self.part(kicked_user, channel_name)
-                                user.socket.sendall(
-                                    "\n> You have kicked {0} from channel {1}.\n".format(_user, channel_name).encode('utf8'))
+                            if user in self.channels[channel_name].channel_ops:
+                                if channel_name == self.users_channels_map[kicked_user.username]:
+                                    self.part(kicked_user, channel_name)
+                                    user.socket.sendall(
+                                        "\n> You have kicked {0} from channel {1}.\n".format(_user, channel_name).encode('utf8'))
+                                else:
+                                    user.socket.sendall(
+                                        "\n> User is not in that channel.\n".encode('utf8'))
                             else:
                                 user.socket.sendall(
-                                    "\n> User is not in that channel.\n".encode('utf8'))
+                                    "\n> You do not have permission to kick on this channel.\n".encode('utf8'))
 
                         else:   #no channel provided, use users current channel
                             if user.username in self.users_channels_map:
                                  channel_name = self.users_channels_map[user.username]
-                                 if channel_name == self.users_channels_map[kicked_user.username]:
-                                     self.part(kicked_user, channel_name)
+                                 if user in self.channels[channel_name].channel_ops:
+                                     if channel_name == self.users_channels_map[kicked_user.username]:
+                                         self.part(kicked_user, channel_name)
+                                     else:
+                                         user.socket.sendall(
+                                             "\n> User is not in your channel.\n".encode('utf8'))
                                  else:
                                      user.socket.sendall(
-                                         "\n> User is not in your channel.\n".encode('utf8'))
+                                         "\n> You do not have permission to kick on this channel.\n".encode('utf8'))
                             else:
                                 user.socket.sendall(
                                     "\n> Please provide the user's channel, or enter their channel, to kick them\n".encode('utf8'))

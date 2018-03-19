@@ -29,7 +29,16 @@ class Channel:
                 user.socket.sendall("{0} {1}".format(username, chatMessage).encode('utf8'))
 
     def get_all_users_in_channel(self):
-        return ' '.join([user.username for user in self.users])
+        temp = ""
+        for user in self.users:
+            if user in self.channel_ops:
+                temp += user.username
+                temp += "+ "
+            else:
+                temp += user.username
+                temp += " "
+        return temp
+
 
     def remove_user_from_channel(self, user):
         self.users.remove(user)
