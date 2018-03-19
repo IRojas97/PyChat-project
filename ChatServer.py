@@ -12,14 +12,17 @@ class Server:
 
     HELP_MESSAGE = """\n> The list of commands available are:
 
-/help                   - Show the instructions
-/join [channel_name]    - To create or switch to a channel.
-/quit                   - Exits the program.
-/list                   - Lists all available channels.
-/nick [nickname]        - Set a new nickname if not already in use.
-/away [away_message]    - Set a new away message or remove away status.
-/time                   - Returns the local time from the server 
-/topic <channel name> [topic] \n\n""".encode('utf8')
+/help                       - Show the instructions
+/join [channel_name]        - To create or switch to a channel.
+/quit                       - Exits the program.
+/list                       - Lists all available channels.
+/nick [nickname]            - Set a new nickname if not already in use.
+/away [away_message]        - Set a new away message or remove away status.
+/time                       - Returns the local time from the server 
+/topic <channel> [topic]    - To view/set a topic for a channel
+/part [channel]             - Leaves channel provided, or current channel if none
+/kick <user> [channel]      - Force part a user from a channel, or current channel if none
+\n\n""".encode('utf8')
 
     WELCOME_MESSAGE = "\n> Welcome to our chat app!!! What is your name?\n".encode('utf8')
 
@@ -115,6 +118,8 @@ class Server:
                 self.handle_topic(user, chatMessage)
             elif '/part' in chatMessage:
                 self.part(user, chatMessage)
+            elif '/kick' in chatMessage:
+                self.kick(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -257,7 +262,7 @@ class Server:
                     self.channels[self.users_channels_map[user.username]].remove_user_from_channel(user)
                     del self.users_channels_map[user.username]
                     user.socket.sendall(
-                        "\n> {0} has parted from the channel: {0}\n".format(user.username).encode('utf8'))
+                        "\n> You have parted from the channel: {0}\n".format(channelName).encode('utf8'))
                 else:
                     user.socket.sendall(
                         "\n> User not in channel: {0}\n".format(channelName).encode('utf8'))
@@ -270,13 +275,55 @@ class Server:
                 self.channels[self.users_channels_map[user.username]].remove_user_from_channel(user)
                 del self.users_channels_map[user.username]
                 user.socket.sendall(
-                "\n> {0} has parted from the channel: {0}\n".format(user.username).encode('utf8'))
+                "\n> You have parted from the channel: {0}\n".format(channelName).encode('utf8'))
             else:
                 user.socket.sendall(
-                    "\n> User not in any channel.\n".encode('utf8'))
+                    "\n> User not in channel.\n".encode('utf8'))
         else:
             self.help(clientSocket)
 
+    def kick(self, user, chatMessage):  #TODO channel_op verification
+        if len(chatMessage.split()) >= 2:
+            _user = chatMessage.split()[1]
+            found = False;
+            for users in self.users:
+                if users.username == _user:
+                    found = True;
+                    kicked_user = users
+                    if kicked_user != user:
+                        if len(chatMessage.split()) >= 3:
+                            channel_name = chatMessage.split()[2]
+                            if channel_name == self.users_channels_map[kicked_user.username]:
+                                self.part(kicked_user, channel_name)
+                                user.socket.sendall(
+                                    "\n> You have kicked {0} from channel {1}.\n".format(_user, channel_name).encode('utf8'))
+                            else:
+                                user.socket.sendall(
+                                    "\n> User is not in that channel.\n".encode('utf8'))
+
+                        else:   #no channel provided, use users current channel
+                            if user.username in self.users_channels_map:
+                                 channel_name = self.users_channels_map[user.username]
+                                 if channel_name == self.users_channels_map[kicked_user.username]:
+                                     self.part(kicked_user, channel_name)
+                                 else:
+                                     user.socket.sendall(
+                                         "\n> User is not in your channel.\n".encode('utf8'))
+                            else:
+                                user.socket.sendall(
+                                    "\n> Please provide the user's channel, or enter their channel, to kick them\n".encode('utf8'))
+                    else:
+                        user.socket.sendall(
+                            "\n> Use /part to remove yourself from a channel\n".encode('utf8'))
+            if not found:
+                user.socket.sendall(
+                    "\n> User not found on server: {0}\n".format(_user).encode('utf8'))
+
+        elif len(chatMessage.split()) == 1:  #no user given
+                user.socket.sendall(
+                "\n> Type /kick <user> [channel] to kick user from designated or current channel\n".format(user.username).encode('utf8'))
+        else:
+            self.help(clientSocket)
 
     def send_message(self, user, chatMessage):
         if user.username in self.users_channels_map:
