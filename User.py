@@ -9,6 +9,7 @@ class User:
         self._usertype = usertype
         self._status = "Online"
 
+
     @property
     def socket(self):
         return self._client_socket

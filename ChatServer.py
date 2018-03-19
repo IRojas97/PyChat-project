@@ -18,7 +18,8 @@ class Server:
 /list                   - Lists all available channels.
 /nick [nickname]        - Set a new nickname if not already in use.
 /away [away_message]    - Set a new away message or remove away status.
-/time                   - Returns the local time from the server \n\n""".encode('utf8')
+/time                   - Returns the local time from the server 
+/topic <channel name> [topic] \n\n""".encode('utf8')
 
     WELCOME_MESSAGE = "\n> Welcome to our chat app!!! What is your name?\n".encode('utf8')
 
@@ -110,6 +111,8 @@ class Server:
                 self.away(user, chatMessage)
             elif '/time' in chatMessage:
                 self.get_time(user, chatMessage)
+            elif '/topic' in chatMessage:
+                self.handle_topic(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -154,6 +157,7 @@ class Server:
                 if not channelName in self.channels:
                     newChannel = Channel.Channel(channelName)
                     self.channels[channelName] = newChannel
+                    self.channels[channelName].channel_ops.append(user)
 
                 self.channels[channelName].users.append(user)
                 self.channels[channelName].welcome_user(user.username)
@@ -212,7 +216,36 @@ class Server:
 
     def get_time(self,user, chatMessage):
         user.socket.sendall(
-            "\n> Current local time from server is: {0}".format(str(datetime.now())).encode('utf8'))
+            "\n> Current local time from server is: {0}\n".format(str(datetime.now())).encode('utf8'))
+
+    def handle_topic(self, user, chatMessage):
+        if len(chatMessage.split()) > 2:   # give a channel  topic
+            channelName = chatMessage.split(' ', 2)[1]
+            if channelName in self.channels:
+                new_topic = chatMessage.split(' ', 2)[2]
+                self.channels[channelName].set_topic(user, new_topic)
+                if self.users_channels_map[user.username] != channelName:
+                    user.socket.sendall(
+                        "\n> You have set the topic for \"{0}\" to: {1}\n".format(channelName, new_topic).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> Channel \"{0}\" was not found.\n".format(channelName).encode('utf8'))
+
+        elif len(chatMessage.split()) == 2:   #view current topic of channel
+            channelName = chatMessage.split()[1]
+            if channelName in self.channels:
+                current_topic = self.channels[channelName]._topic
+                user.socket.sendall(
+                    "\n> Current topic for channel \"{0}\" is set to: {1}\n".format(channelName, current_topic).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> Channel \"{0}\" was not found.\n".format(channelName).encode('utf8'))
+
+        elif len(chatMessage.split()) == 1:
+            user.socket.sendall(
+                "\n> Type /topic <channel_name> [topic] to view or set a topic for a channel\n".format(user.status).encode('utf8'))
+        else:
+            self.help(clientSocket)
 
 
     def send_message(self, user, chatMessage):
