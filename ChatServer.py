@@ -113,6 +113,8 @@ class Server:
                 self.get_time(user, chatMessage)
             elif '/topic' in chatMessage:
                 self.handle_topic(user, chatMessage)
+            elif '/part' in chatMessage:
+                self.part(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -244,6 +246,34 @@ class Server:
         elif len(chatMessage.split()) == 1:
             user.socket.sendall(
                 "\n> Type /topic <channel_name> [topic] to view or set a topic for a channel\n".format(user.status).encode('utf8'))
+        else:
+            self.help(clientSocket)
+
+    def part(self, user, chatMessage):
+        if len(chatMessage.split()) >= 2:   #leave channel provided
+            channelName = chatMessage.split()[1]
+            if user.username in self.users_channels_map:
+                if self.users_channels_map[user.username] == channelName:
+                    self.channels[self.users_channels_map[user.username]].remove_user_from_channel(user)
+                    del self.users_channels_map[user.username]
+                    user.socket.sendall(
+                        "\n> {0} has parted from the channel: {0}\n".format(user.username).encode('utf8'))
+                else:
+                    user.socket.sendall(
+                        "\n> User not in channel: {0}\n".format(channelName).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> User not in any channel.\n".encode('utf8'))
+        elif len(chatMessage.split()) == 1:  #leave current channel
+            if user.username in self.users_channels_map:
+                channelName = self.users_channels_map[user.username]
+                self.channels[self.users_channels_map[user.username]].remove_user_from_channel(user)
+                del self.users_channels_map[user.username]
+                user.socket.sendall(
+                "\n> {0} has parted from the channel: {0}\n".format(user.username).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> User not in any channel.\n".encode('utf8'))
         else:
             self.help(clientSocket)
 

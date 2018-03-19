@@ -8,6 +8,7 @@ class User:
         self._password = password
         self._usertype = usertype
         self._status = "Online"
+        self.user_modes = []
 
 
     @property
@@ -34,6 +35,10 @@ class User:
     def status(self):
         return self._status
 
+    @property
+    def _user_modes(self):
+        return self.user_modes
+
     @username.setter
     def username(self, new_username):
         self._username = new_username
@@ -44,7 +49,7 @@ class User:
 
     @usertype.setter
     def usertype(self, new_usertype):
-        self._usertype = usertype
+        self._usertype = new_usertype
 
     @password.setter
     def password(self, new_password):
@@ -53,3 +58,10 @@ class User:
     @status.setter
     def status(self, new_status):
         self._status = new_status
+
+    @_user_modes.setter
+    def _user_modes(self, _mode):
+        if _mode in self.user_modes:
+            self.user_modes.remove(_mode)
+        else:
+            self.user_modes.append(_mode)

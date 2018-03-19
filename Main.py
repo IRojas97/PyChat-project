@@ -34,6 +34,9 @@ class SocketThreadedTask(threading.Thread):
                 elif 'left' in message:
                     self.callbacks['update_chat_window'](message)
                     self.callbacks['remove_user_from_list'](message.split(' ')[2])
+                elif 'parted' in message:
+                    self.callbacks['clear_chat_window']()
+                    self.callbacks['update_chat_window'](message)
                 else:
                     self.callbacks['update_chat_window'](message)
             except OSError:
