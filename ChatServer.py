@@ -25,7 +25,7 @@ class Server:
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
 /users                      - List all users and their current status (Online, Away)
-/who <channel>              - Returns list of all users in chat
+/who <channel>              - Returns list of all users in channel
 /whois <user>               - Returns information on specified user
 \n\n""".encode('utf8')
 
@@ -406,10 +406,24 @@ class Server:
                 if _user.username == request_user:
                     replyMessage += "\n> "
                     replyMessage += _user.to_string()
-            _user.socket.sendall(replyMessage.encode('utf8'))
+            user.socket.sendall(replyMessage.encode('utf8'))
         else:
             user.socket.sendall(
                 "\n> Type /whois <user> to see information about a user\n".format(
+                    user.username).encode('utf8'))
+
+    def handle_who(self, user, chatMessage):
+        if len(chatMessage.split()) >= 2:
+            request_channel = chatMessage.split()[1]
+            replyMessage = "\n\n> " + request_channel + " has users:\n"
+            if request_channel in self.channels:
+                replyMessage += self.channels[request_channel].get_all_users_in_channel()
+            else:
+                replyMessage = "\n\n> Channel not found.\n"
+            user.socket.sendall(replyMessage.encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> Type /who <channel> to see information about a channel\n".format(
                     user.username).encode('utf8'))
 
     def send_message(self, user, chatMessage):

@@ -30,13 +30,16 @@ class Channel:
 
     def get_all_users_in_channel(self):
         temp = ""
-        for user in self.users:
-            if user in self.channel_ops:
-                temp += user.username
-                temp += "+ "
-            else:
-                temp += user.username
-                temp += " "
+        if len(self.users) >= 1:
+            for user in self.users:
+                if user in self.channel_ops:
+                    temp += user.username
+                    temp += "+ "
+                else:
+                    temp += user.username
+                    temp += " "
+        else:
+            temp += "NONE "
         return temp
 
 
