@@ -15,13 +15,14 @@ class Server:
 /help                       - Show the instructions
 /join [channel_name]        - To create or switch to a channel.
 /quit                       - Exits the program.
-/list                       - Lists all available channels.
+/list [channels]            - Lists all, or the specified, channels and their topics.
 /nick [nickname]            - Set a new nickname if not already in use.
 /away [away_message]        - Set a new away message or remove away status.
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
 /part [channel]             - Leaves channel provided, or current channel if none
 /kick <user> [channel]      - Force part a user from a channel, or current channel if none
+/users                      - List all users and their current status (Online, Away)
 \n\n""".encode('utf8')
 
     WELCOME_MESSAGE = "\n> Welcome to our chat app!!! What is your name?\n".encode('utf8')
@@ -103,7 +104,7 @@ class Server:
                 self.quit(user)
                 break
             elif '/list' in chatMessage:
-                self.list_all_channels(user)
+                self.handle_list(user, chatMessage)
             elif '/help' in chatMessage:
                 self.help(user)
             elif '/join' in chatMessage:
@@ -120,6 +121,8 @@ class Server:
                 self.part(user, chatMessage)
             elif '/kick' in chatMessage:
                 self.kick(user, chatMessage)
+            elif '/users' == chatMessage.split()[0]:
+                self.list_all_users(user)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -139,9 +142,26 @@ class Server:
         else:
             chatMessage = '\n\n> Current channels available are: \n'
             for channel in self.channels:
-                chatMessage += "    \n" + channel + ": " + str(len(self.channels[channel].users)) + " user(s)"
+                chatMessage += "    \n" + channel + ", topic currently: " + self.channels[channel].topic()
             chatMessage += "\n"
             user.socket.sendall(chatMessage.encode('utf8'))
+
+    def handle_list(self,user, chatMessage):
+        split_message = chatMessage.split(' ', 1)
+        if len(split_message) >= 2:
+            channel_list = split_message[1].split()
+            chatMessage = '\n\n> Current topics for queried channels: \n'
+            for channel in channel_list:
+                if channel in self.channels:
+                    chatMessage += "    \n" + channel + ",\t topic currently: " + self.channels[channel].topic()
+                else:
+                    chatMessage += "    \n" + channel + "\t does not exist!"
+
+            chatMessage += "\n"
+            user.socket.sendall(chatMessage.encode('utf8'))
+
+        else:
+            self.list_all_channels(user)
 
     def help(self, user):
         user.socket.sendall(Server.HELP_MESSAGE)
@@ -332,6 +352,21 @@ class Server:
                 "\n> Type /kick <user> [channel] to kick user from designated or current channel\n".format(user.username).encode('utf8'))
         else:
             self.help(clientSocket)
+
+    def list_all_users(self,user):
+        if len(self.users) == 0:
+            chatMessage = "\n> No Users connected.\n".encode('utf8')
+            user.socket.sendall(chatMessage)
+        else:
+            chatMessage = '\n\n> Current users connected: \n'
+            for user in self.users:
+                chatMessage += "    \n" + user.username + ": "
+                if user.status != "Online":
+                    chatMessage += "Away - "
+                chatMessage += user.status
+            chatMessage += "\n"
+            user.socket.sendall(chatMessage.encode('utf8'))
+
 
     def send_message(self, user, chatMessage):
         if user.username in self.users_channels_map:

@@ -57,3 +57,6 @@ class Channel:
         else:
             chatMessage = '\n\n> You do not have permission to change topic\n'.encode('utf8')
             user.socket.sendall(chatMessage)
+
+    def topic(self):
+        return self._topic
