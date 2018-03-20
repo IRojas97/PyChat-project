@@ -25,6 +25,8 @@ class Server:
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
 /users                      - List all users and their current status (Online, Away)
+/who <channel>              - Returns list of all users in chat
+/whois <user>               - Returns information on specified user
 \n\n""".encode('utf8')
 
     WELCOME_MESSAGE = "\n> Welcome to our chat app!!! What is your name?\n".encode('utf8')
@@ -129,6 +131,10 @@ class Server:
                 user.socket.sendall("\n> Pong\n".encode('utf8'))
             elif '/ison' in chatMessage:
                 self.handle_ison(user, chatMessage)
+            elif '/whois' in chatMessage:
+                self.handle_whois(user, chatMessage)
+            elif '/who' in chatMessage:
+                self.handle_who(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -390,6 +396,20 @@ class Server:
         else:
             user.socket.sendall(
                 "\n> Type /ison <users> to see if space-separated list of users are online\n".format(
+                    user.username).encode('utf8'))
+
+    def handle_whois(self, user, chatMessage):
+        if len(chatMessage.split()) >= 2:
+            request_user = chatMessage.split()[1]
+            replyMessage = ""
+            for _user in self.users:
+                if _user.username == request_user:
+                    replyMessage += "\n> "
+                    replyMessage += _user.to_string()
+            _user.socket.sendall(replyMessage.encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> Type /whois <user> to see information about a user\n".format(
                     user.username).encode('utf8'))
 
     def send_message(self, user, chatMessage):
