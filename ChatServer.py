@@ -12,16 +12,18 @@ class Server:
 
     HELP_MESSAGE = """\n> The list of commands available are:
 
+/away [away_message]        - Set a new away message or remove away status.
+/ison <nicknames>           - See if space-separated list of users are online.
 /help                       - Show the instructions
 /join [channel_name]        - To create or switch to a channel.
-/quit                       - Exits the program.
+/kick <user> [channel]      - Force part a user from a channel, or current channel if none
 /list [channels]            - Lists all, or the specified, channels and their topics.
 /nick [nickname]            - Set a new nickname if not already in use.
-/away [away_message]        - Set a new away message or remove away status.
+/part [channel]             - Leaves channel provided, or current channel if none
+/ping                       - Used to request Pong from server, to check if connection is still live 
+/quit                       - Exits the program.
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
-/part [channel]             - Leaves channel provided, or current channel if none
-/kick <user> [channel]      - Force part a user from a channel, or current channel if none
 /users                      - List all users and their current status (Online, Away)
 \n\n""".encode('utf8')
 
@@ -123,6 +125,10 @@ class Server:
                 self.kick(user, chatMessage)
             elif '/users' == chatMessage.split()[0]:
                 self.list_all_users(user)
+            elif '/ping' in chatMessage:
+                user.socket.sendall("\n> Pong\n".encode('utf8'))
+            elif '/ison' in chatMessage:
+                self.handle_ison(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -353,7 +359,7 @@ class Server:
         else:
             self.help(clientSocket)
 
-    def list_all_users(self,user):
+    def list_all_users(self, _user):
         if len(self.users) == 0:
             chatMessage = "\n> No Users connected.\n".encode('utf8')
             user.socket.sendall(chatMessage)
@@ -365,8 +371,26 @@ class Server:
                     chatMessage += "Away - "
                 chatMessage += user.status
             chatMessage += "\n"
-            user.socket.sendall(chatMessage.encode('utf8'))
+            _user.socket.sendall(chatMessage.encode('utf8'))
 
+    def handle_ison(self, user, chatMessage):
+        split_message = chatMessage.split(' ',1)
+        if(len(split_message) == 2):
+            user_list = split_message[1].split()
+            replyMessage = "\n\n > From queried users:\n"
+            userMessage = ""
+            for _user in self.users:
+                if _user.username in user_list:
+                    userMessage += _user.username + "\n"
+            if userMessage == "":
+                userMessage = "NONE\n"
+            replyMessage += userMessage
+            replyMessage += "are connected."
+            user.socket.sendall(replyMessage.encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> Type /ison <users> to see if space-separated list of users are online\n".format(
+                    user.username).encode('utf8'))
 
     def send_message(self, user, chatMessage):
         if user.username in self.users_channels_map:
