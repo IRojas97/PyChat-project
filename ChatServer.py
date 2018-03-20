@@ -20,7 +20,9 @@ class Server:
 /list [channels]            - Lists all, or the specified, channels and their topics.
 /nick [nickname]            - Set a new nickname if not already in use.
 /part [channel]             - Leaves channel provided, or current channel if none
-/ping                       - Used to request Pong from server, to check if connection is still live 
+/ping                       - Used to request Pong from server, to check if connection is still live
+/pong                       - Replies with Ping
+/privmsg <user> <message>   - Sends a private message to user
 /quit                       - Exits the program.
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
@@ -129,12 +131,16 @@ class Server:
                 self.list_all_users(user)
             elif '/ping' in chatMessage:
                 user.socket.sendall("\n> Pong\n".encode('utf8'))
+            elif '/pong' in chatMessage:
+                user.socket.sendall("\n> Ping\n".encode('utf8'))
             elif '/ison' in chatMessage:
                 self.handle_ison(user, chatMessage)
             elif '/whois' in chatMessage:
                 self.handle_whois(user, chatMessage)
             elif '/who' in chatMessage:
                 self.handle_who(user, chatMessage)
+            elif 'privmsg' in chatMessage:
+                self.handle_pm(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -424,6 +430,32 @@ class Server:
         else:
             user.socket.sendall(
                 "\n> Type /who <channel> to see information about a channel\n".format(
+                    user.username).encode('utf8'))
+
+    def handle_pm(self, user, chatMessage):
+        split_message = chatMessage.split(' ', 2)
+        if len(split_message) >= 3:
+            sent = False
+            to_user = split_message[1]
+            privMessage = split_message[2]
+            for _user in self.users:
+                if _user.username == to_user:
+                    _user.socket.sendall(
+                        "\nFrom> {0}: {1}".format(user.username, privMessage).encode('utf8'))
+                    user.socket.sendall(
+                        "\nTo> {0}: {1}".format(_user.username, privMessage).encode('utf8'))
+                    sent = True
+                    if _user.status != "Online":
+                        user.socket.sendall(
+                            "\n\n> {0} is currently away: {1}".format(_user.username, _user.status).encode('utf8'))
+
+            if not sent:
+                user.socket.sendall(
+                    "\n> Error with privmsg.\n> Type /privmsg <user> <message> to send private message to user\n".format(
+                        user.username).encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> Type /privmsg <user> <message> to send private message to user\n".format(
                     user.username).encode('utf8'))
 
     def send_message(self, user, chatMessage):
