@@ -1,12 +1,13 @@
 import Util
 
 class User:
-    def __init__(self, client_socket, username='', nickname=Util.generate_random_nickname(), password='', usertype='user'):
+    def __init__(self, client_socket, username='', nickname='', password='', usertype='user', realname=''):
         self._client_socket = client_socket
         self._username = username
         self._nickname = nickname
         self._password = password
         self._usertype = usertype
+        self._realname = realname
         self._status = "Online"
         self.user_modes = []
 
@@ -32,6 +33,10 @@ class User:
         return self._password
 
     @property
+    def realname(self):
+        return self._realname
+
+    @property
     def status(self):
         return self._status
 
@@ -54,6 +59,10 @@ class User:
     @password.setter
     def password(self, new_password):
         self._password = new_password
+
+    @realname.setter
+    def realname(self, new_realname):
+        self._realname = new_realname
 
     @status.setter
     def status(self, new_status):

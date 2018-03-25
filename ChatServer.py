@@ -31,7 +31,7 @@ class Server:
 /whois <user>               - Returns information on specified user
 \n\n""".encode('utf8')
 
-    WELCOME_MESSAGE = "\n> Welcome to our chat app!!! What is your name?\n".encode('utf8')
+    WELCOME_MESSAGE = "\n> Welcome to our chat app!!! Please enter a PASS,followed by NICK, then USER command\n".encode('utf8')
 
     def __init__(self, host=socket.gethostbyname('localhost'), port=50000, allowReuseAddress=True, timeout=3):
         self.address = (host, port)
@@ -86,13 +86,31 @@ class Server:
         user.socket.sendall(Server.WELCOME_MESSAGE)
 
     def client_thread(self, user, size=4096):
-        username = Util.generate_username(user.socket.recv(size).decode('utf8')).lower()
+        password = user.password
+        username = user.username
+        nickname = user.nickname
 
-        while not username:
-            user.socket.sendall("\n> Please enter your full name(first and last. middle optional).\n".encode('utf8'))
-            username = Util.generate_username(user.socket.recv(size).decode('utf8')).lower()
+        while not user.password:
+            user.password = "@"
+            user.socket.sendall("\n> Please enter /pass <password> to set a password for your account (Not Required. Cannot be changed or created after registering).\n".encode('utf8'))
+            passMessage = (user.socket.recv(size).decode('utf8')).split()
+            if ('/pass' in passMessage) and len(passMessage) >= 2:
+                password = passMessage[1]
+                user.password = password
 
-        user.username = username
+        while not user.nickname:
+            user.socket.sendall("\n> Please enter /nick <nickname>  to set initial nickname (Can be changed after registering).\n".encode('utf8'))
+            nickname = user.socket.recv(size).decode('utf8').lower()
+            if '/nick' in nickname:
+                self.nick(user, nickname)
+
+
+        while not user.username:
+            user.socket.sendall("\n> Please enter /user <username> <realname> to set username and real name (ONLY realname can be changed after registering).\n".encode('utf8'))
+            username = user.socket.recv(size).decode('utf8').lower()
+            if '/user' in username:
+                self.user(user, username)
+
 
         welcomeMessage = '\n> Welcome {0}, type /help for a list of helpful commands.\n\n'.format(user.username).encode('utf8')
         user.socket.sendall(welcomeMessage)
@@ -116,7 +134,7 @@ class Server:
             elif '/join' in chatMessage:
                 self.join(user, chatMessage)
             elif 'nick' in chatMessage:
-                self.nick(user,chatMessage)
+                self.nick(user, chatMessage)
             elif '/away' in chatMessage:
                 self.away(user, chatMessage)
             elif '/time' in chatMessage:
@@ -208,7 +226,7 @@ class Server:
                 self.channels[channelName].welcome_user(user.username)
                 self.users_channels_map[user.username] = channelName
         else:
-            self.help(clientSocket)
+            user.socket.sendall("\n> /join [channel_name]  To create or switch to a channel.".encode('utf8'))
 
     def nick(self, user, chatMessage):
         isNickNameTaken = False
@@ -230,10 +248,40 @@ class Server:
             if not isNickNameTaken:
                 user.nickname = NickName
                 user.socket.sendall(
-                    "\n> Successfully updated nickname: {0}".format(user.nickname).encode('utf8'))
+                    "\n> Successfully updated nickname: {0}\n".format(user.nickname).encode('utf8'))
 
         else:
-            self.help(clientSocket)
+            self.help(user)
+
+    def user(self, user, chatMessage):
+        isUserNameTaken = False
+        splitMess = chatMessage.split(' ', 2)
+        if len(splitMess) >= 3:
+            UserName = splitMess[1]
+            RealName = splitMess[2]
+
+            if user in self.users:
+                if user.username == UserName:  # see if user already has this username
+                    user.socket.sendall("\n> You already have this username: {0}".format(UserName).encode('utf8'))
+                    isUserNameTaken = True
+                else:  # see if this username is taken
+                    for users in self.users:
+                        if users.username == UserName:
+                            user.socket.sendall(
+                                "\n> Username already in use: {0}".format(UserName).encode('utf8'))
+                            isUserNameTaken = True
+
+            if not isUserNameTaken:
+                user.username = UserName
+                user.realname = RealName
+                user.socket.sendall(
+                    "\n> Successfully updated username: {0}\n".format(user.username).encode('utf8'))
+
+
+        elif len(splitMess) == 1:  # no user given
+            user.socket.sendall(
+                "\n> Type /user <username> <realname> to to set username and real name\n".format(
+                    user.username).encode('utf8'))
 
     def away(self, user, chatMessage):
         if len(chatMessage.split()) >= 2:  #set away status
@@ -257,7 +305,7 @@ class Server:
                     "\n> User status already {0}. Use /away [away_message] to set an away message.".format(user.status).encode('utf8'))
 
         else:
-            self.help(clientSocket)
+            self.help(user)
 
     def get_time(self,user, chatMessage):
         user.socket.sendall(
@@ -290,7 +338,7 @@ class Server:
             user.socket.sendall(
                 "\n> Type /topic <channel_name> [topic] to view or set a topic for a channel\n".format(user.status).encode('utf8'))
         else:
-            self.help(clientSocket)
+            self.help(user)
 
     def part(self, user, chatMessage):
         if len(chatMessage.split()) >= 2:   #leave channel provided
@@ -318,7 +366,7 @@ class Server:
                 user.socket.sendall(
                     "\n> User not in channel.\n".encode('utf8'))
         else:
-            self.help(clientSocket)
+            self.help(user)
 
     def kick(self, user, chatMessage):
         if len(chatMessage.split()) >= 2:
@@ -368,13 +416,12 @@ class Server:
         elif len(chatMessage.split()) == 1:  #no user given
                 user.socket.sendall(
                 "\n> Type /kick <user> [channel] to kick user from designated or current channel\n".format(user.username).encode('utf8'))
-        else:
-            self.help(clientSocket)
+
 
     def list_all_users(self, _user):
         if len(self.users) == 0:
             chatMessage = "\n> No Users connected.\n".encode('utf8')
-            user.socket.sendall(chatMessage)
+            _user.socket.sendall(chatMessage)
         else:
             chatMessage = '\n\n> Current users connected: \n'
             for user in self.users:
@@ -460,7 +507,7 @@ class Server:
 
     def send_message(self, user, chatMessage):
         if user.username in self.users_channels_map:
-            self.channels[self.users_channels_map[user.username]].broadcast_message(chatMessage, "{0}: ".format(user.username))
+            self.channels[self.users_channels_map[user.username]].broadcast_message(chatMessage, user.username)
         else:
             chatMessage = """\n> You are currently not in any channels:
 

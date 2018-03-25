@@ -18,15 +18,22 @@ class Channel:
                 chatMessage = '> Topic currently set to: {0}\n'.format(self._topic).encode('utf8')
                 user.socket.sendall(chatMessage)
             else:
-                chatMessage = '\n\n> {0} has joined the channel {1}!\n|{2}'.format(username, self.channel_name, all_users).encode('utf8')
+                chatMessage = '\n> {0} has joined the channel {1}!\n\n|{2}'.format(username, self.channel_name, all_users).encode('utf8')
                 user.socket.sendall(chatMessage)
+
+    def broadcast_message_all(self, chatMessage):
+        for user in self.users:
+                user.socket.sendall("{0}".format(chatMessage).encode('utf8'))
 
     def broadcast_message(self, chatMessage, username=''):
         for user in self.users:
             if user.username is username:
                 user.socket.sendall("You: {0}".format(chatMessage).encode('utf8'))
             else:
-                user.socket.sendall("{0} {1}".format(username, chatMessage).encode('utf8'))
+                user.socket.sendall("{0}: {1}".format(username, chatMessage).encode('utf8'))
+
+
+
 
     def get_all_users_in_channel(self):
         temp = ""
@@ -34,19 +41,19 @@ class Channel:
             for user in self.users:
                 if user in self.channel_ops:
                     temp += user.username
-                    temp += "+ "
+                    temp += " "
                 else:
                     temp += user.username
                     temp += " "
         else:
             temp += "NONE "
-        return temp
+        return temp[:-1]
 
 
     def remove_user_from_channel(self, user):
         self.users.remove(user)
         leave_message = "\n> {0} has left the channel {1}\n".format(user.username, self.channel_name)
-        self.broadcast_message(leave_message)
+        self.broadcast_message_all(leave_message)
 
     def set_topic(self, user, newtopic):
         if "t" not in self.channel_modes:

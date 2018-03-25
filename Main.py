@@ -28,12 +28,11 @@ class SocketThreadedTask(threading.Thread):
                     break
                 elif 'joined' in message:
                     split_message = message.split('|')
-                    self.callbacks['clear_chat_window']()
                     self.callbacks['update_chat_window'](split_message[0])
                     self.callbacks['update_user_list'](split_message[1])
                 elif 'left' in message:
                     self.callbacks['update_chat_window'](message)
-                    self.callbacks['remove_user_from_list'](message.split(' ')[2])
+                    self.callbacks['remove_user_from_list'](message.split(' ')[1])
                 elif 'parted' in message:
                     self.callbacks['clear_chat_window']()
                     self.callbacks['update_chat_window'](message)
