@@ -76,4 +76,4 @@ class User:
             self.user_modes.append(_mode)
 
     def to_string(self):
-        return "Username: " + self.username + ", Nickname: " + self.nickname + ", Usertype: " + self.usertype + ", Status: " + self.status + "\n"
+        return "Username: " + self.username + ", Nickname: " + self.nickname + ", Usertype: " + self.usertype + ", Status: " + self.status + ", Real Name: " + self.realname + "\n"

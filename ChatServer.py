@@ -3,6 +3,7 @@ import sys
 import threading
 import Channel
 import User
+import Account
 import Util
 from datetime import datetime
 
@@ -39,6 +40,7 @@ class Server:
         self.users_channels_map = {} # User Name -> Channel Name
         self.client_thread_list = [] # A list of all threads that are either running or have finished their task.
         self.users = [] # A list of all the users who are connected to the server.
+        self.accounts = {}  # username -> accounts
         self.exit_signal = threading.Event()
 
         try:
@@ -87,29 +89,18 @@ class Server:
 
     def client_thread(self, user, size=4096):
         password = user.password
-        username = user.username
-        nickname = user.nickname
 
-        while not user.password:
+
+        while not user.password or not user.nickname or not user.username:
             user.password = "@"
-            user.socket.sendall("\n> Please enter /pass <password> to set a password for your account (Not Required. Cannot be changed or created after registering).\n".encode('utf8'))
+            user.socket.sendall("\n> Please enter /pass <password> to begin registration or /connect <nickname> <username> <password> to login into an existing account .\n".encode('utf8'))
             passMessage = (user.socket.recv(size).decode('utf8')).split()
-            if ('/pass' in passMessage) and len(passMessage) >= 2:
-                password = passMessage[1]
-                user.password = password
-
-        while not user.nickname:
-            user.socket.sendall("\n> Please enter /nick <nickname>  to set initial nickname (Can be changed after registering).\n".encode('utf8'))
-            nickname = user.socket.recv(size).decode('utf8').lower()
-            if '/nick' in nickname:
-                self.nick(user, nickname)
+            if ('/pass' in passMessage) and len(passMessage) == 2:
+                self.handle_register(user, passMessage, size)
+            if ('/connect' in passMessage) and len(passMessage) >= 3:
+                self.handle_connect(user, passMessage)
 
 
-        while not user.username:
-            user.socket.sendall("\n> Please enter /user <username> <realname> to set username and real name (ONLY realname can be changed after registering).\n".encode('utf8'))
-            username = user.socket.recv(size).decode('utf8').lower()
-            if '/user' in username:
-                self.user(user, username)
 
 
         welcomeMessage = '\n> Welcome {0}, type /help for a list of helpful commands.\n\n'.format(user.username).encode('utf8')
@@ -170,6 +161,66 @@ class Server:
     def quit(self, user):
         user.socket.sendall('/quit'.encode('utf8'))
         self.remove_user(user)
+
+    def handle_register(self, user, regMessage, size):
+        password = regMessage[1]
+        user.password = password
+        account = Account.Account(password=user.password)
+        while not user.username:
+            user.socket.sendall(
+                "\n> Please enter <nickname> <username> <real name> (Nick and user must not be in use)".encode('utf8'))
+            regMessage = user.socket.recv(size).decode('utf8').lower().split(' ', 2)
+            if len(regMessage) == 3:
+                nickname = regMessage[0]
+                username = regMessage[1]
+                realname = regMessage[2]
+                inUse = False
+                for users in self.users:
+                    if users.nickname == nickname:
+                        user.socket.sendall(
+                            "\n> Nickname already in use: {0}".format(nickname).encode('utf8'))
+                        inUse = True
+                    if users.username == username:
+                        user.socket.sendall(
+                            "\n> Username already in use: {0}".format(username).encode('utf8'))
+                        inUse = True
+                if not inUse:
+                    user.nickname = nickname
+                    user.username = username
+                    user.realname = realname
+                    account.nickname = nickname
+                    account.username = username
+                    account.realname = realname
+                    self.accounts[account.username] = account
+
+
+
+
+    def handle_connect(self,user, connMessage):
+        inUse = False
+        username = connMessage[2]
+        nickname = connMessage[1]
+        if len(connMessage) == 4:
+            password = connMessage[3]
+        else:
+            password = '@'
+        if username in self.accounts:
+            if self.accounts[username].nickname == nickname and self.accounts[username].password == password:
+                for users in self.users:
+                    if users.username == username:
+                        user.socket.sendall(
+                            "\n> Username already Online: {0}".format(username).encode('utf8'))
+                        inUse = True
+                    if users.nickname == self.accounts[username].nickname:
+                        user.socket.sendall(
+                            "\n> Nickname already Online: {0}".format(self.accounts[username].nickname).encode('utf8'))
+                        inUse = True
+                if not inUse:
+                    user.username = self.accounts[username].username
+                    user.nickname = self.accounts[username].nickname
+                    user.password = self.accounts[username].password
+                    user.usertype = self.accounts[username].usertype
+                    user.realname = self.accounts[username].realname
 
     def list_all_channels(self, user):
         if len(self.channels) == 0:
@@ -247,6 +298,7 @@ class Server:
 
             if not isNickNameTaken:
                 user.nickname = NickName
+                self.accounts[user.username].nickname = NickName
                 user.socket.sendall(
                     "\n> Successfully updated nickname: {0}\n".format(user.nickname).encode('utf8'))
 
@@ -271,7 +323,7 @@ class Server:
                                 "\n> Username already in use: {0}".format(UserName).encode('utf8'))
                             isUserNameTaken = True
 
-            if not isUserNameTaken:
+            if not isUserNameTaken and not user.username and not user.realname:
                 user.username = UserName
                 user.realname = RealName
                 user.socket.sendall(
