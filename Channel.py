@@ -40,10 +40,10 @@ class Channel:
         if len(self.users) >= 1:
             for user in self.users:
                 if user in self.channel_ops:
-                    temp += user.username
+                    temp += user.nickname
                     temp += " "
                 else:
-                    temp += user.username
+                    temp += user.nickname
                     temp += " "
         else:
             temp += "NONE "
@@ -52,7 +52,7 @@ class Channel:
 
     def remove_user_from_channel(self, user):
         self.users.remove(user)
-        leave_message = "\n> {0} has left the channel {1}\n".format(user.username, self.channel_name)
+        leave_message = "\n> {0} has left the channel {1}\n".format(user.nickname, self.channel_name)
         self.broadcast_message_all(leave_message)
 
     def set_topic(self, user, newtopic):

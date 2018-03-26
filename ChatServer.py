@@ -14,7 +14,7 @@ class Server:
     HELP_MESSAGE = """\n> The list of commands available are:
 
 /away [away_message]        - Set a new away message or remove away status.
-/ison <nicknames>           - See if space-separated list of users are online.
+/ison <nicknames>           - See if space-separated list of nicks are online.
 /help                       - Show the instructions
 /join [channel_name]        - To create or switch to a channel.
 /kick <user> [channel]      - Force part a user from a channel, or current channel if none
@@ -23,7 +23,7 @@ class Server:
 /part [channel]             - Leaves channel provided, or current channel if none
 /ping                       - Used to request Pong from server, to check if connection is still live
 /pong                       - Replies with Ping
-/privmsg <user> <message>   - Sends a private message to user
+/privmsg <nick> <message>   - Sends a private message to user
 /quit                       - Exits the program.
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
@@ -32,7 +32,7 @@ class Server:
 /whois <user>               - Returns information on specified user
 \n\n""".encode('utf8')
 
-    WELCOME_MESSAGE = "\n> Welcome to our chat app!!! Please enter a PASS,followed by NICK, then USER command\n".encode('utf8')
+    WELCOME_MESSAGE = "\n> Welcome to our chat app!!!\n".encode('utf8')
 
     def __init__(self, host=socket.gethostbyname('localhost'), port=50000, allowReuseAddress=True, timeout=3):
         self.address = (host, port)
@@ -42,6 +42,8 @@ class Server:
         self.users = [] # A list of all the users who are connected to the server.
         self.accounts = {}  # username -> accounts
         self.exit_signal = threading.Event()
+        self.accounts['admin'] = Account.Account('admin', 'admin', 'password', 'admin', 'Ivan Rojas')
+        self.accounts['sysop'] = Account.Account('sysop', 'sysop', 'password', 'sysop', 'Ivan Rojas')
 
         try:
             self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -167,22 +169,57 @@ class Server:
         user.password = password
         account = Account.Account(password=user.password)
         while not user.username:
-            user.socket.sendall(
-                "\n> Please enter <nickname> <username> <real name> (Nick and user must not be in use)".encode('utf8'))
-            regMessage = user.socket.recv(size).decode('utf8').lower().split(' ', 2)
-            if len(regMessage) == 3:
-                nickname = regMessage[0]
-                username = regMessage[1]
-                realname = regMessage[2]
+            regMessage = ''
+
+            while not regMessage:
+                user.socket.sendall(
+                    "\n> Please enter /nick <nickname> (Nick must not be in use)\n".encode('utf8'))
+
+                regMessage = user.socket.recv(size).decode('utf8').lower()
+                if '/nick ' not in regMessage:
+                    regMessage = ''
+                elif '+' in regMessage or '$' in regMessage or '*' in regMessage:
+                    regMessage = ''
+                    user.socket.sendall(
+                        "\n> Use of symbols '+' or '$' or '*' not allowed\n".encode('utf8'))
+
+            regMessage += " "
+            userMessage = ''
+            while not userMessage:
+                user.socket.sendall(
+                    "\n> Please enter /user <username> <real name> (User must not be in use)\n".encode(
+                        'utf8'))
+
+                userMessage = user.socket.recv(size).decode('utf8').lower()
+
+                if '/user ' not in userMessage:
+                    userMessage = ''
+
+                elif '+' in userMessage or '$' in userMessage or '*' in userMessage:
+                    userMessage = ''
+                    user.socket.sendall(
+                        "\n> Use of symbols '+' or '$' or '*' not allowed\n".encode('utf8'))
+                else:
+                    regMessage += userMessage
+
+            regMessage = regMessage.split(' ', 4)
+
+
+            if len(regMessage) == 5 and regMessage[0] == '/nick' and regMessage[2] == '/user':
+                nickname = regMessage[1]
+                username = regMessage[3]
+                realname = regMessage[4]
                 inUse = False
+
+
                 for users in self.users:
                     if users.nickname == nickname:
                         user.socket.sendall(
-                            "\n> Nickname already in use: {0}".format(nickname).encode('utf8'))
+                            "\n> Nickname already in use: {0}\n".format(nickname).encode('utf8'))
                         inUse = True
                     if users.username == username:
                         user.socket.sendall(
-                            "\n> Username already in use: {0}".format(username).encode('utf8'))
+                            "\n> Username already in use: {0}\n".format(username).encode('utf8'))
                         inUse = True
                 if not inUse:
                     user.nickname = nickname
@@ -487,13 +524,13 @@ class Server:
         split_message = chatMessage.split(' ',1)
         if(len(split_message) == 2):
             user_list = split_message[1].split()
-            replyMessage = "\n\n > From queried users:\n"
+            replyMessage = "\n\n > From queried nicks:\n"
             userMessage = ""
             for _user in self.users:
-                if _user.username in user_list:
-                    userMessage += _user.username + "\n"
+                if _user.nickname in user_list:
+                    userMessage += _user.nickname + "\n"
             if userMessage == "":
-                userMessage = "NONE\n"
+                userMessage = "NONE "
             replyMessage += userMessage
             replyMessage += "are connected."
             user.socket.sendall(replyMessage.encode('utf8'))
@@ -537,24 +574,22 @@ class Server:
             to_user = split_message[1]
             privMessage = split_message[2]
             for _user in self.users:
-                if _user.username == to_user:
+                if _user.nickname == to_user:
                     _user.socket.sendall(
-                        "\nFrom> {0}: {1}".format(user.username, privMessage).encode('utf8'))
+                        "\nFrom> {0}: {1}".format(user.nickname, privMessage).encode('utf8'))
                     user.socket.sendall(
-                        "\nTo> {0}: {1}".format(_user.username, privMessage).encode('utf8'))
+                        "\nTo> {0}: {1}".format(_user.nickname, privMessage).encode('utf8'))
                     sent = True
                     if _user.status != "Online":
                         user.socket.sendall(
-                            "\n\n> {0} is currently away: {1}".format(_user.username, _user.status).encode('utf8'))
+                            "\n\n> {0} is currently away: {1}".format(_user.nickname, _user.status).encode('utf8'))
 
             if not sent:
                 user.socket.sendall(
-                    "\n> Error with privmsg.\n> Type /privmsg <user> <message> to send private message to user\n".format(
-                        user.username).encode('utf8'))
+                    "\n> Error with privmsg.\n> Type /privmsg <nick> <message> to send private message to user\n".encode('utf8'))
         else:
             user.socket.sendall(
-                "\n> Type /privmsg <user> <message> to send private message to user\n".format(
-                    user.username).encode('utf8'))
+                "\n> Type /privmsg <nick> <message> to send private message to user\n".encode('utf8'))
 
     def send_message(self, user, chatMessage):
         if user.username in self.users_channels_map:
