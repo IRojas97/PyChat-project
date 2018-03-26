@@ -54,3 +54,6 @@ class Account:
     @realname.setter
     def realname(self, new_realname):
         self._realname = new_realname
+
+    def tostring(self):
+        return self.username + ' ' + self.nickname + ' ' + self.password + ' ' + self.usertype + ' ' + self.realname + '\n'

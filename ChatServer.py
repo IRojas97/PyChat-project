@@ -4,6 +4,7 @@ import threading
 import Channel
 import User
 import Account
+import fileinput
 import Util
 from datetime import datetime
 
@@ -42,8 +43,7 @@ class Server:
         self.users = [] # A list of all the users who are connected to the server.
         self.accounts = {}  # username -> accounts
         self.exit_signal = threading.Event()
-        self.accounts['admin'] = Account.Account('admin', 'admin', 'password', 'admin', 'Ivan Rojas')
-        self.accounts['sysop'] = Account.Account('sysop', 'sysop', 'password', 'sysop', 'Ivan Rojas')
+
 
         try:
             self.serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -85,6 +85,20 @@ class Server:
         for client in self.client_thread_list:
             if client.is_alive():
                 client.join()
+
+    def init_accounts(self, filepath = ''):
+        accPath = filepath + 'accounts.txt'
+        with open(accPath, "r") as ins:
+            accounts = []
+            for line in ins:
+                line = line.rstrip('\n')
+                if line and ('#' not in line):
+                    accounts.append(line)
+
+        for acc in accounts:
+            acc = acc.split(' ', 4)
+            if len(acc) >= 5:
+                self.accounts[acc[0]] = Account.Account(acc[0], acc[1], acc[2], acc[3], acc[4])
 
     def welcome_user(self, user):
         user.socket.sendall(Server.WELCOME_MESSAGE)
@@ -229,9 +243,7 @@ class Server:
                     account.username = username
                     account.realname = realname
                     self.accounts[account.username] = account
-
-
-
+                    self.appendfile('accounts.txt', account.tostring())
 
     def handle_connect(self,user, connMessage):
         inUse = False
@@ -311,7 +323,7 @@ class Server:
                     self.channels[channelName].channel_ops.append(user)
 
                 self.channels[channelName].users.append(user)
-                self.channels[channelName].welcome_user(user.username)
+                self.channels[channelName].welcome_user(user)
                 self.users_channels_map[user.username] = channelName
         else:
             user.socket.sendall("\n> /join [channel_name]  To create or switch to a channel.".encode('utf8'))
@@ -334,7 +346,9 @@ class Server:
                             isNickNameTaken = True
             if not isNickNameTaken:
                 user.nickname = NickName
+                target = self.accounts[user.username].tostring()
                 self.accounts[user.username].nickname = NickName
+                self.editfile('accounts.txt', target, self.accounts[user.username].tostring())
                 user.socket.sendall(
                     "\n> Successfully updated nickname: {0}\n".format(user.nickname).encode('utf8'))
 
@@ -610,6 +624,17 @@ Use /join [channel name] to join a channel.\n\n""".encode('utf8')
         self.users.remove(user)
         print("Client: {0} has left\n".format(user.username))
 
+    def appendfile(self, filename='', line=''):
+        with open(filename, "a") as app:
+            app.write(line)
+
+    def editfile(self, filename='', target='', newinfo=''):
+        with fileinput.FileInput(filename, inplace=True) as edit:
+            for line in edit:
+                print(line.replace(target, newinfo), end='')
+
+
+
     def server_shutdown(self):
         print("Shutting down chat server.\n")
         self.serverSocket.close()
@@ -619,7 +644,7 @@ def main():
 
     print("\nListening on port {0}".format(chatServer.address[1]))
     print("Waiting for connections...\n")
-
+    chatServer.init_accounts()
     chatServer.start_listening()
     chatServer.server_shutdown()
 

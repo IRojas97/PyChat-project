@@ -1,0 +1,3 @@
+# Correct format <username> <nickname> <password> <usertype> <real name>
+admin admin password admin Ivan Rojas
+sysop sysop password sysop ivan rojas

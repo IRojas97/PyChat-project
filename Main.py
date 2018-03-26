@@ -28,6 +28,8 @@ class SocketThreadedTask(threading.Thread):
                     break
                 elif 'joined' in message:
                     split_message = message.split('|')
+                    if 'have joined' in message:
+                        self.callbacks['clear_chat_window']()
                     self.callbacks['update_chat_window'](split_message[0])
                     self.callbacks['update_user_list'](split_message[1])
                 elif 'left' in message:
