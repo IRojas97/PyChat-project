@@ -100,6 +100,29 @@ class Server:
             if len(acc) >= 5:
                 self.accounts[acc[0]] = Account.Account(acc[0], acc[1], acc[2], acc[3], acc[4])
 
+    def init_channels(self, filepath = ''):
+        chanPath = filepath + 'channels.txt'
+        with open(chanPath, "r") as ins:
+            channels = []
+            for line in ins:
+                line = line.rstrip('\n')
+                if line and ('#' not in line):
+                    channels.append(line)
+
+        for chan in channels:
+            splitMess = chan.split(' ', 2)
+            if len(splitMess) >= 3:
+                name = splitMess[0]
+                password = splitMess[1]
+                if password == '@':
+                    password = ''
+                splitMess = splitMess[2].split(':')
+                topic = splitMess[1].strip()
+                modes = splitMess[2].split()
+                ops = splitMess[3].split()
+
+                self.channels[name] = Channel.Channel(name, topic, password, modes, ops)
+
     def welcome_user(self, user):
         user.socket.sendall(Server.WELCOME_MESSAGE)
 
@@ -304,9 +327,13 @@ class Server:
 
     def join(self, user, chatMessage):
         isInSameRoom = False
+        passFail = False
 
         if len(chatMessage.split()) >= 2:
             channelName = chatMessage.split()[1]
+            channelPass = ''
+            if len(chatMessage.split()) == 3:
+                channelPass = chatMessage.split()[2]
 
             if user.username in self.users_channels_map: # Here we are switching to a new channel.
                 if self.users_channels_map[user.username] == channelName:
@@ -316,17 +343,21 @@ class Server:
                     oldChannelName = self.users_channels_map[user.username]
                     self.channels[oldChannelName].remove_user_from_channel(user) # remove them from the previous channel
 
-            if not isInSameRoom:
+            if not isInSameRoom:   #create channel
                 if not channelName in self.channels:
-                    newChannel = Channel.Channel(channelName)
-                    self.channels[channelName] = newChannel
-                    self.channels[channelName].channel_ops.append(user)
-
-                self.channels[channelName].users.append(user)
-                self.channels[channelName].welcome_user(user)
-                self.users_channels_map[user.username] = channelName
+                    self.channels[channelName] = Channel.Channel(channelName, password=channelPass)
+                    self.channels[channelName].channel_ops.append(user.username)
+                    self.appendfile('channels.txt', self.channels[channelName].tostring())
+                if self.channels[channelName].channel_pass == channelPass:
+                    self.channels[channelName].users.append(user)
+                    self.channels[channelName].welcome_user(user)
+                    self.users_channels_map[user.username] = channelName
+                else:
+                    user.socket.sendall(
+                        "\n> /join [channel_name]  [key] To create or switch to a channel. Entered Key Incorrect".encode(
+                            'utf8'))
         else:
-            user.socket.sendall("\n> /join [channel_name]  To create or switch to a channel.".encode('utf8'))
+            user.socket.sendall("\n> /join [channel_name]  [key] To create or switch to a channel. Use key if password is set for channel".encode('utf8'))
 
     def nick(self, user, chatMessage):
         isNickNameTaken = False
@@ -414,11 +445,13 @@ class Server:
             "\n> Current local time from server is: {0}\n".format(str(datetime.now())).encode('utf8'))
 
     def handle_topic(self, user, chatMessage):
-        if len(chatMessage.split()) > 2:   # give a channel  topic
+        if len(chatMessage.split()) > 2:   # give a channel a topic
             channelName = chatMessage.split(' ', 2)[1]
             if channelName in self.channels:
                 new_topic = chatMessage.split(' ', 2)[2]
+                target = self.channels[channelName].tostring()
                 self.channels[channelName].set_topic(user, new_topic)
+                self.editfile('channels.txt', target, self.channels[channelName].tostring())
                 if self.users_channels_map[user.username] != channelName:
                     user.socket.sendall(
                         "\n> You have set the topic for \"{0}\" to: {1}\n".format(channelName, new_topic).encode('utf8'))
@@ -606,8 +639,15 @@ class Server:
                 "\n> Type /privmsg <nick> <message> to send private message to user\n".encode('utf8'))
 
     def send_message(self, user, chatMessage):
+        temp = user.nickname
+        if user.usertype == 'admin':
+            temp += "*"
+        elif user.usertype == 'sysop':
+            temp += "$"
+        elif user.username in self.channels[self.users_channels_map[user.username]].channel_ops:
+            temp += "+"
         if user.username in self.users_channels_map:
-            self.channels[self.users_channels_map[user.username]].broadcast_message(chatMessage, user.username)
+            self.channels[self.users_channels_map[user.username]].broadcast_message(chatMessage, temp)
         else:
             chatMessage = """\n> You are currently not in any channels:
 
@@ -629,9 +669,16 @@ Use /join [channel name] to join a channel.\n\n""".encode('utf8')
             app.write(line)
 
     def editfile(self, filename='', target='', newinfo=''):
-        with fileinput.FileInput(filename, inplace=True) as edit:
-            for line in edit:
-                print(line.replace(target, newinfo), end='')
+        with open(filename, "r") as ins:
+            data = ins.readlines()
+
+        for line in data:
+            if line == target:
+                data[data.index(line)] = newinfo
+
+        with open(filename, "w") as out:
+            out.writelines(data)
+
 
 
 
@@ -645,6 +692,7 @@ def main():
     print("\nListening on port {0}".format(chatServer.address[1]))
     print("Waiting for connections...\n")
     chatServer.init_accounts()
+    chatServer.init_channels()
     chatServer.start_listening()
     chatServer.server_shutdown()
 

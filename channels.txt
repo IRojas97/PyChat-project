@@ -1,0 +1,5 @@
+#<name> <password> :<topic> :<modes> :<ops>
+# empty password can be represented with @
+ex pass :topic will be here :a b c d :ops1 ops2 ops3
+a @ :topic : :ops1
+h @ :new topic : :userrs
