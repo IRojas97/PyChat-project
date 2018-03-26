@@ -3,7 +3,5 @@
 #
 admin admin password admin Ivan Rojas
 sysop sysop password sysop ivan rojas
-ops1 ops1 abc123 user rte
-iro iro abc user irojas
-userrs h abc user real
-
+u n abc user r n
+uu add abc user r n

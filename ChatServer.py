@@ -28,6 +28,7 @@ class Server:
 /quit                       - Exits the program.
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
+/userip <nickname>          - Returns ip address of user if online. Only callable by admins and sysops
 /users                      - List all users and their current status (Online, Away)
 /who <channel>              - Returns list of all users in channel
 /whois <user>               - Returns information on specified user
@@ -163,7 +164,7 @@ class Server:
                 self.help(user)
             elif '/join' in chatMessage:
                 self.join(user, chatMessage)
-            elif 'nick' in chatMessage:
+            elif '/nick' in chatMessage:
                 self.nick(user, chatMessage)
             elif '/away' in chatMessage:
                 self.away(user, chatMessage)
@@ -187,8 +188,10 @@ class Server:
                 self.handle_whois(user, chatMessage)
             elif '/who' in chatMessage:
                 self.handle_who(user, chatMessage)
-            elif 'privmsg' in chatMessage:
+            elif '/privmsg' in chatMessage:
                 self.handle_pm(user, chatMessage)
+            elif '/userip' in chatMessage:
+                self.handle_userip(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -249,12 +252,12 @@ class Server:
                 inUse = False
 
 
-                for users in self.users:
-                    if users.nickname == nickname:
+                for users in self.accounts:
+                    if self.accounts[users].nickname == nickname:
                         user.socket.sendall(
                             "\n> Nickname already in use: {0}\n".format(nickname).encode('utf8'))
                         inUse = True
-                    if users.username == username:
+                    if self.accounts[users].username == username:
                         user.socket.sendall(
                             "\n> Username already in use: {0}\n".format(username).encode('utf8'))
                         inUse = True
@@ -611,8 +614,7 @@ class Server:
             user.socket.sendall(replyMessage.encode('utf8'))
         else:
             user.socket.sendall(
-                "\n> Type /who <channel> to see information about a channel\n".format(
-                    user.username).encode('utf8'))
+                "\n> Type /who <channel> to see information about a channel\n".encode('utf8'))
 
     def handle_pm(self, user, chatMessage):
         split_message = chatMessage.split(' ', 2)
@@ -637,6 +639,28 @@ class Server:
         else:
             user.socket.sendall(
                 "\n> Type /privmsg <nick> <message> to send private message to user\n".encode('utf8'))
+
+    def handle_userip(self, user, chatMessage):
+        splitMess = chatMessage.split()
+        found = False
+        if user.usertype == 'admin' or user.usertype == 'sysop':
+            if len(splitMess) == 2:
+                nickname = splitMess[1]
+                for _user in self.users:
+                    if _user.nickname == nickname:
+                        ip = _user.socket.getpeername()
+                        user.socket.sendall("\n> {0} is connected with IP address {1} and port {2}\n".format(nickname, ip[0],
+                                                                                            ip[1]).encode('utf8'))
+                        found = True
+                if not found:
+                    user.socket.sendall(
+                        "\n> Type /userip <nickname> to see IP of a nickname. {0} not online\n".format(nickname).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> Type /userip <nickname> to see IP of a nickname\n".encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> Reserved for Admins and Sysops only\n".encode('utf8'))
 
     def send_message(self, user, chatMessage):
         temp = user.nickname
@@ -672,9 +696,13 @@ Use /join [channel name] to join a channel.\n\n""".encode('utf8')
         with open(filename, "r") as ins:
             data = ins.readlines()
 
+        while('\n' in data):
+            data.remove('\n')
+
         for line in data:
             if line == target:
                 data[data.index(line)] = newinfo
+
 
         with open(filename, "w") as out:
             out.writelines(data)
