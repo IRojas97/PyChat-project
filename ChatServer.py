@@ -290,12 +290,11 @@ class Server:
                     user.socket.sendall("\n> You already have this nickname: {0}".format(NickName).encode('utf8'))
                     isNickNameTaken = True
                 else:  # see if this nickname is taken
-                    for users in self.users:
-                        if users.nickname == NickName:
+                    for acc in self.accounts:
+                        if self.accounts[acc].nickname == NickName:
                             user.socket.sendall(
                                 "\n> Nickname already in use: {0}".format(NickName).encode('utf8'))
                             isNickNameTaken = True
-
             if not isNickNameTaken:
                 user.nickname = NickName
                 self.accounts[user.username].nickname = NickName
