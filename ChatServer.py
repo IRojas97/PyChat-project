@@ -19,6 +19,7 @@ class Server:
 /help                       - Show the instructions
 /join [channel_name]        - To create or switch to a channel.
 /kick <user> [channel]      - Force part a user from a channel, or current channel if none
+/kill <nickname>            - Force a client to quit the server, reserved for Ops
 /list [channels]            - Lists all, or the specified, channels and their topics.
 /nick [nickname]            - Set a new nickname if not already in use.
 /part [channel]             - Leaves channel provided, or current channel if none
@@ -26,10 +27,12 @@ class Server:
 /pong                       - Replies with Ping
 /privmsg <nick> <message>   - Sends a private message to user
 /quit                       - Exits the program.
+/setname <new real name>    - Allows user to change real name after registration
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
 /userip <nickname>          - Returns ip address of user if online. Only callable by admins and sysops
 /users                      - List all users and their current status (Online, Away)
+/wallops <message>          - Sends message to all Ops online
 /who <channel>              - Returns list of all users in channel
 /whois <user>               - Returns information on specified user
 \n\n""".encode('utf8')
@@ -192,6 +195,12 @@ class Server:
                 self.handle_pm(user, chatMessage)
             elif '/userip' in chatMessage:
                 self.handle_userip(user, chatMessage)
+            elif '/wallops' in chatMessage:
+                self.wallops(user, chatMessage)
+            elif '/kill' in chatMessage:
+                self.handle_kill(user, chatMessage)
+            elif '/setname' in chatMessage:
+                self.handle_setname(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -594,9 +603,11 @@ class Server:
             request_user = chatMessage.split()[1]
             replyMessage = ""
             for _user in self.users:
-                if _user.username == request_user:
+                if _user.nickname == request_user:
                     replyMessage += "\n> "
                     replyMessage += _user.to_string()
+            if not replyMessage:
+                replyMessage = "\n> NONE are online\n"
             user.socket.sendall(replyMessage.encode('utf8'))
         else:
             user.socket.sendall(
@@ -661,6 +672,49 @@ class Server:
         else:
             user.socket.sendall(
                 "\n> Reserved for Admins and Sysops only\n".encode('utf8'))
+
+    def wallops(self, user, chatMessage):
+        splitMess = chatMessage.split(' ', 1)
+        message = "\n WALLOPS From> {0}: ".format(user.nickname)
+        if len(splitMess) == 2:
+            message += splitMess[1]
+            message += '\n'
+            for users in self.users:
+                if users.usertype == 'admin' or users.usertype == 'sysop':
+                    users.socket.sendall(message.encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> /wallops <message> to send message to all Ops currently online\n".encode('utf8'))
+
+    def handle_kill(self, user, chatMessage):
+        splitMess = chatMessage.split()
+        if len(splitMess) == 2:
+            if user.usertype == 'admin' or user.usertype == 'sysop':
+                target = splitMess[1]
+                for users in self.users:
+                    if users.nickname == target:
+                        self.quit(users)
+                        user.socket.sendall(
+                            "\n> {0} was removed from the server\n".format(target).encode('utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> This command is reserved for Ops only\n".encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> /kill <nickname> to remove client from server. Reserved for Ops only\n".encode('utf8'))
+
+    def handle_setname(self,user, chatMessage):
+        splitMess = chatMessage.split(' ', 1)
+        if len(splitMess) == 2:
+            target = self.accounts[user.username].tostring()
+            user.realname = splitMess[1]
+            self.accounts[user.username].realname = splitMess[1]
+            self.editfile('accounts.txt', target, self.accounts[user.username].tostring())
+            user.socket.sendall(
+                "\n> Name set to: {0}\n".format(splitMess[1]).encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> /setname <new real name> to change your real name\n".encode('utf8'))
 
     def send_message(self, user, chatMessage):
         temp = user.nickname

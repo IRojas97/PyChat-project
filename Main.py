@@ -152,7 +152,7 @@ class ChatGUI(tk.Frame):
 
     def initUI(self, parent):
         self.parent = parent
-        self.parent.title("ChatApp")
+        self.parent.title("Ivan Rojas's ChatApp")
 
         screenSizeX = self.parent.winfo_screenwidth()
         screenSizeY = self.parent.winfo_screenheight()
