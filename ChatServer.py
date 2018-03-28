@@ -1,4 +1,5 @@
 import socket
+import os
 import sys
 import threading
 import Channel
@@ -15,13 +16,18 @@ class Server:
     HELP_MESSAGE = """\n> The list of commands available are:
 
 /away [away_message]        - Set a new away message or remove away status.
+/die                        - Allows Ops to shutdown server
+/info                       - Returns relevant server information
 /ison <nicknames>           - See if space-separated list of nicks are online.
 /help                       - Show the instructions
 /join [channel_name]        - To create or switch to a channel.
-/kick <user> [channel]      - Force part a user from a channel, or current channel if none
+/kick <user> [channel]      - Force a user to part from a channel, or your current channel if none.
 /kill <nickname>            - Force a client to quit the server, reserved for Ops
 /list [channels]            - Lists all, or the specified, channels and their topics.
 /nick [nickname]            - Set a new nickname if not already in use.
+/oper <nick> <pass>         - Ops nick if supplied password is yours and you are currently Op
+/restart                    - Restarts the server. Closes all connections and reinits.
+/rules                      - Request server's rules
 /part [channel]             - Leaves channel provided, or current channel if none
 /ping                       - Used to request Pong from server, to check if connection is still live
 /pong                       - Replies with Ping
@@ -31,13 +37,33 @@ class Server:
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
 /userip <nickname>          - Returns ip address of user if online. Only callable by admins and sysops
+/userhost <nick names>      = Returns host info for up to 5 nicknames. Reserved for Ops only
 /users                      - List all users and their current status (Online, Away)
+/version                    - Returns current server version on one line
 /wallops <message>          - Sends message to all Ops online
 /who <channel>              - Returns list of all users in channel
 /whois <user>               - Returns information on specified user
 \n\n""".encode('utf8')
 
     WELCOME_MESSAGE = "\n> Welcome to our chat app!!!\n".encode('utf8')
+    SERVER_VERSION = "v1.0"
+    SERVER_PATCH = "p1.0"
+    START_TIME = str(datetime.now())
+    COMP_TIME = str(datetime.fromtimestamp(os.stat("ChatServer.py")[8]))
+    INFO_MESSAGE = """\n> SERVER INFORMATION:
+         Server Name:           Ivan's Chat Server
+         Server Version:        {0}
+         Server Patch:          {1}
+         Server Started:        {2}
+         Server Compiled:       {3}
+         \n""".format(SERVER_VERSION,SERVER_PATCH,START_TIME[:-7], COMP_TIME).encode('utf8')
+    SERVER_RULES = """\n> SERVER RULES:
+         No Racism or Discrimination
+         No Abuse Towards Ops
+         Stay on topic if one is set
+         and most importantly, Have Fun :)
+        \n""".encode('utf8')
+    restartflag = True
 
     def __init__(self, host=socket.gethostbyname('localhost'), port=50000, allowReuseAddress=True, timeout=3):
         self.address = (host, port)
@@ -91,6 +117,8 @@ class Server:
                 client.join()
 
     def init_accounts(self, filepath = ''):
+        self.restartflag = False
+        self.exit_signal.clear()
         accPath = filepath + 'accounts.txt'
         with open(accPath, "r") as ins:
             accounts = []
@@ -136,8 +164,8 @@ class Server:
 
         while not user.password or not user.nickname or not user.username:
             user.password = "@"
-            user.socket.sendall("\n> Please enter /pass <password> to begin registration or /connect <nickname> <username> <password> to login into an existing account .\n".encode('utf8'))
-            passMessage = (user.socket.recv(size).decode('utf8')).split()
+            user.socket.sendall("\n> Please enter /pass <password> to begin registration (no caps) or /connect <nickname> <username> <password> to login into an existing account .\n".encode('utf8'))
+            passMessage = (user.socket.recv(size).decode('utf8').lower()).split()
             if ('/pass' in passMessage) and len(passMessage) == 2:
                 self.handle_register(user, passMessage, size)
             if ('/connect' in passMessage) and len(passMessage) >= 3:
@@ -201,6 +229,22 @@ class Server:
                 self.handle_kill(user, chatMessage)
             elif '/setname' in chatMessage:
                 self.handle_setname(user, chatMessage)
+            elif '/userhost' in chatMessage:
+                self.handle_userhost(user, chatMessage)
+            elif '/die' in chatMessage:
+                self.handle_die(user)
+                break
+            elif '/info' in chatMessage:
+                self.info(user)
+            elif '/version' in chatMessage:
+                self.version(user)
+            elif '/restart' in chatMessage:
+                self.restart(user)
+                break
+            elif '/oper' in chatMessage:
+                self.handle_oper(user, chatMessage)
+            elif '/rules' in chatMessage:
+                self.rules(user)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -660,8 +704,7 @@ class Server:
                 for _user in self.users:
                     if _user.nickname == nickname:
                         ip = _user.socket.getpeername()
-                        user.socket.sendall("\n> {0} is connected with IP address {1} and port {2}\n".format(nickname, ip[0],
-                                                                                            ip[1]).encode('utf8'))
+                        user.socket.sendall("\n> {0} is connected with IP address {1} on port {2}\n".format(nickname, ip[0], ip[1]).encode('utf8'))
                         found = True
                 if not found:
                     user.socket.sendall(
@@ -715,6 +758,83 @@ class Server:
         else:
             user.socket.sendall(
                 "\n> /setname <new real name> to change your real name\n".encode('utf8'))
+
+    def handle_userhost(self, user, chatMessage):
+        splitMess = chatMessage.split(' ', 1)
+        if user.usertype == 'user':
+            user.socket.sendall(
+                "\n> /userhost <nickname> [nick names] is reserved for operators\n".encode('utf8'))
+        elif len(splitMess) == 2:
+            nicks = splitMess[1].split()
+            if len(nicks) <= 5:
+                user.socket.sendall(
+                    "\n> Found Userhost information for following users:\n".encode(
+                        'utf8'))
+                for nick in nicks:
+                    for users in self.users:
+                        if users.nickname == nick:
+                            host = users.socket.getpeername()
+
+                            user.socket.sendall(
+                                "> {0} on Host {1}\n".format(nick, host[0]).encode(
+                                    'utf8'))
+            else:
+                user.socket.sendall(
+                    "\n> /userhost <nickname> [nick names] to get host information for up to 5 nicknames\n".encode(
+                        'utf8'))
+        else:
+            user.socket.sendall(
+                "\n> /userhost <nickname> [nick names] to get host information for up to 5 nicknames\n".encode('utf8'))
+
+    def handle_die(self, user):
+        if user.usertype == 'admin' or user.usertype == 'sysop':
+            self.exit_signal.set()
+        else:
+            user.socket.sendall(
+                "\n> /die is reserved for operators only\n".encode('utf8'))
+
+    def handle_oper(self, user, chatMessage):
+        splitMess = chatMessage.split()
+        if len(splitMess) >=2 :
+            if not (splitMess[2] == user.password):
+                user.socket.sendall(
+                    "\n> /oper <nickname> <password> where password is your password\n".encode('utf8'))
+            elif user.usertype != 'admin' and user.usertype != 'sysop':
+                user.socket.sendall(
+                    "\n> /oper <nickname> <password> Is reserved for Ops only\n".encode('utf8'))
+            else:
+                nick = splitMess[1]
+                for users in self.users:
+                    if users.nickname == nick:
+                        users.usertype = 'sysop'
+                        target = self.accounts[users.username].tostring()
+                        self.accounts[users.username].usertype = 'sysop'
+                        self.editfile('accounts.txt', target, self.accounts[users.username].tostring())
+                        user.socket.sendall(
+                            "\n> {0} is now sysop\n".format(nick).encode('utf8'))
+                        users.socket.sendall(
+                            "\n> You are now sysop\n".encode('utf8'))
+        else:
+            user.socket.sendall(
+                "\n> /oper <nickname> <password> to Op nick. Is reserved for operators only\n".encode('utf8'))
+
+    def info(self, user):
+        user.socket.sendall(Server.INFO_MESSAGE)
+
+    def version(self, user):
+        user.socket.sendall(
+            "\n> Current Server Version is {0}\n".format(Server.SERVER_VERSION).encode('utf8'))
+
+    def restart(self, user):
+        if user.usertype == 'admin' or user.usertype == 'sysop':
+            self.restartflag = True
+            self.exit_signal.set()
+        else:
+            user.socket.sendall(
+                "\n> /restart is reserved for operators only\n".encode('utf8'))
+
+    def rules(self, user):
+        user.socket.sendall(Server.SERVER_RULES)
 
     def send_message(self, user, chatMessage):
         temp = user.nickname
@@ -770,13 +890,15 @@ Use /join [channel name] to join a channel.\n\n""".encode('utf8')
 
 def main():
     chatServer = Server()
-
-    print("\nListening on port {0}".format(chatServer.address[1]))
-    print("Waiting for connections...\n")
-    chatServer.init_accounts()
-    chatServer.init_channels()
-    chatServer.start_listening()
-    chatServer.server_shutdown()
+    while chatServer.restartflag is True:
+        if chatServer.restartflag:
+            chatServer = Server()
+        print("\nListening on port {0}".format(chatServer.address[1]))
+        print("Waiting for connections...\n")
+        chatServer.init_accounts()
+        chatServer.init_channels()
+        chatServer.start_listening()
+        chatServer.server_shutdown()
 
 if __name__ == "__main__":
     main()

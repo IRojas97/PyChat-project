@@ -3,5 +3,5 @@
 #
 admin admin password admin Ivan Rojas
 sysop sysop password sysop ivan rojas
-u n abc user real name for real
+u n abc sysop real name for real
 uu add abc user r n

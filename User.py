@@ -1,4 +1,5 @@
 import Util
+import socket
 
 class User:
     def __init__(self, client_socket, username='', nickname='', password='', usertype='user', realname=''):
