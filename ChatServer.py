@@ -25,6 +25,7 @@ class Server:
 /kill <nickname>            - Force a client to quit the server, reserved for Ops
 /list [channels]            - Lists all, or the specified, channels and their topics.
 /nick [nickname]            - Set a new nickname if not already in use.
+/notice [msg] [nick]        - Same as Priv Msg except away auto replies are not sent as response.
 /oper <nick> <pass>         - Ops nick if supplied password is yours and you are currently Op
 /restart                    - Restarts the server. Closes all connections and reinits.
 /rules                      - Request server's rules
@@ -37,7 +38,7 @@ class Server:
 /time                       - Returns the local time from the server 
 /topic <channel> [topic]    - To view/set a topic for a channel
 /userip <nickname>          - Returns ip address of user if online. Only callable by admins and sysops
-/userhost <nick names>      = Returns host info for up to 5 nicknames. Reserved for Ops only
+/userhost <nick names>      - Returns host info for up to 5 nicknames. Reserved for Ops only
 /users                      - List all users and their current status (Online, Away)
 /version                    - Returns current server version on one line
 /wallops <message>          - Sends message to all Ops online
@@ -245,6 +246,8 @@ class Server:
                 self.handle_oper(user, chatMessage)
             elif '/rules' in chatMessage:
                 self.rules(user)
+            elif 'notice' in chatMessage:
+                self.handle_notice(user, chatMessage)
             else:
                 self.send_message(user, chatMessage + '\n')
 
@@ -680,9 +683,9 @@ class Server:
             for _user in self.users:
                 if _user.nickname == to_user:
                     _user.socket.sendall(
-                        "\nFrom> {0}: {1}".format(user.nickname, privMessage).encode('utf8'))
+                        "\nPM From> {0}: {1}".format(user.nickname, privMessage).encode('utf8'))
                     user.socket.sendall(
-                        "\nTo> {0}: {1}".format(_user.nickname, privMessage).encode('utf8'))
+                        "\nPM To> {0}: {1}".format(_user.nickname, privMessage).encode('utf8'))
                     sent = True
                     if _user.status != "Online":
                         user.socket.sendall(
@@ -835,6 +838,28 @@ class Server:
 
     def rules(self, user):
         user.socket.sendall(Server.SERVER_RULES)
+
+    def handle_notice(self, user, chatMessage):
+        split_message = chatMessage.split(' ', 2)
+        if len(split_message) >= 3:
+            sent = False
+            to_user = split_message[1]
+            notice = split_message[2]
+            for _user in self.users:
+                if _user.nickname == to_user:
+                    _user.socket.sendall(
+                        "\nNOTICE From> {0}: {1}".format(user.nickname, notice).encode('utf8'))
+                    user.socket.sendall(
+                        "\nNOTICE To> {0}: {1}".format(_user.nickname, notice).encode('utf8'))
+                    sent = True
+
+            if not sent:
+                user.socket.sendall(
+                    "\n> Type /notice <nick> <message> to send notice to user\n".encode(
+                        'utf8'))
+        else:
+            user.socket.sendall(
+                "\n> Type /notice <nick> <message> to send notice to user\n".encode('utf8'))
 
     def send_message(self, user, chatMessage):
         temp = user.nickname
